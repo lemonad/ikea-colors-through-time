@@ -1,18 +1,524 @@
 ---
-title: The snappy title of your project
-author: Jens Jensen (@jensjensen)
+title: IKEA catalogs and colors through time
+author: Jonas Nockert (@lemonad)
 date: 2020-01-15
 output:
   html_document:
     self_contained: true
     toc: true
     toc_depth: 2
+    css: style.css
+    fig.retina: 2
 ---
 
-# Abstract
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggplot2)
+library(ggthemes)
+library(grid)
+library(gridExtra)
+library(magick)
+library(magrittr)
+library(reticulate)
+library(scales)
+library(ggpomological)
+library(tufte)
+# 
+# brew install glpk
+# brew install qhull
+# devtools::install_github("lemonad/colorhull")
+library(colorhull)
 
-# Introduction
+# Use the offical IKEA typeface!
+library(gfonts)
+setup_font(
+  id = "noto-sans",
+  output_dir = "fonts"
+)
+use_font("noto-sans", "fonts/css/noto-sans.css")
+```
+
+
+<br/><center>
+![](./images/ikea-frontpage-plot.png)
+
+*1950-2021: 72 years of IKEA catalog covers.*
+</center>
+
+---
+
+![](./images/page5-1955-form.jpg){style="width: 300px;float: right;margin-right: 0;margin-top: 0.5em;margin-bottom: 0.5em; margin-left: 1em;"}
+
+IKEA has [all their catalogs, 1950--2021, online](https://ikeamuseum.com/sv/ikea-kataloger/),
+which should represent a unique slice of time of what is popular within interior
+design. IKEA worked with customer feedback from the start in order to sell just
+the right products and based on their success over the years (see mail-in form
+from the 1955 catalog to the right), it seems safe to say that IKEA has
+consistently offered what people want.
+
+The question emerges if one could sort of reverse this process and pick up
+general design trends from the catalogs. For example how selections of fabrics,
+patterns, and wood types have shifted over time. Here, the idea is to try to
+pick up trends in color from the catalogs. One can imagine that both colors
+of the products in the catalog as well as the design of the catalog itself will
+follow (or drive) what is popular.
+
+<div style="clear: both"></div>
+
 
 # Data acquisition
+Every catalog page is a high-resolution jpeg-encoded scanned image, e.g. the
+[first page of the 1950 catalog](https://ikeacatalogues.ikea.com/77436/1101577/pages/d6e4d36a-e57c-46f9-9570-292c65d79a50-at2400.jpg):
 
-# Discussion
+<br/><center>
+![](images/page1-1950.jpg){width=500px} 
+
+*Figure: The 1950 catalog's front page (original size of 1934x2977 pixels)*
+</center><br/>
+
+```{r, cached = TRUE, include = FALSE}
+years <- 1950L:2020L
+total_pages <- 0L
+for (year in years) {
+  load(paste0("./data/stats", year, ".RData"))
+  total_pages <- total_pages + length(stats_list)
+}
+```
+
+The idea is to use the raw pixels of each such image (`r total_pages` pages
+in total!) to generate data for analysis. That is, even though the image pixels
+obviously provides the basic level of data, it is not much use directly
+and needs to be refined in order to be useful. It takes many days of cpu-time
+to process all these images so here, by necessity, the raw data is considered to
+be the output of the various preprocessing steps.
+
+## Pixels and colors
+Each image pixel in the 8-bit [RGB color space](https://en.wikipedia.org/wiki/RGB_color_space)
+is composed of a 256-level RGB triple, which amounts to 16.7 million unique
+combinations. The catalogs are about 200-300 pages long and each page
+often use far beyond 100,000 of these combinations. How do we even begin to
+organize or transform this in order to be able to visualize it in a meaningful
+way?
+
+## Mean colors over time
+An obvious starting point is to just find the average color for each page. As
+any good cooking program, anything that takes time has already been prepared
+beforehand so we can just load and plot the page mean colors:
+
+```{r}
+years <- 1950L:2020L
+n_colors <- 1
+tile_size <- c(24, 3)
+x_offset <- 45
+max_n_pages <- 390
+
+ar <- array(
+  1,
+  c(
+    length(years) * n_colors * tile_size[[1]],
+    x_offset + tile_size[[2]] * max_n_pages,
+    3
+  )
+)
+ar[, , 1] <- 1
+ar[, , 2] <- 1
+ar[, , 3] <- 1 # 0.93
+
+y <- 1
+for (year in years) {
+  load(paste0("./data/stats", year, ".RData"))
+  mean_colors <- lapply(stats_list, function(x) x$rgb_mean)
+  x <- x_offset
+  for (col in rep(mean_colors, each = tile_size[[2]])) {
+    ar[y:(y + n_colors * tile_size[[1]] - 1), x, 1:3] <- rep(col, each = tile_size[[1]])
+    x <- x + 1
+  }
+  y <- y + n_colors * tile_size[[1]]
+}
+
+im <- image_read(ar) %>%
+  image_convert(matte = FALSE, depth = 16)
+y <- 4
+for (year in years) {
+  im <- image_annotate(
+    im,
+    year,
+    size = 18,
+    color = "black",
+    gravity = "northeast",
+    location = paste0("+", tile_size[[2]] * max_n_pages + 5, "+", y)
+  )
+  y <- y + n_colors * tile_size[[1]]
+}
+#p1 <- grobTree(
+#    rectGrob(gp = gpar(fill = "transparent", col = NA)),
+#    rasterGrob(im, height = unit(1, "npc"), interpolate = TRUE)
+#  )
+#grid.arrange(grobs = list(p1), ncol = 1, top = "hello")
+im
+```
+
+*Figure: Mean colors per page, per catalog. Front pages to the left.*
+
+<br/>
+
+The 1950-1955 catalogs are actually mostly sepia colored but the rest of
+the catalogs are more colorful than given by this visualization. It does
+not seem that the mean page colors say much about color popularity over time.
+Still, there are some interesting things to note:
+
+* The 1959 and 1960 catalogs seem to use a dark page for every other page with
+  light pages in between.
+* Something happens with the colors in the 1989 and 1990 catalogs which then
+  IKEA seems to have backed away from, since after 1990 it seems the colors
+  went back to what they were before 1989.
+* In 2002, colors suddenly become brighter and more vivid, which is continued to
+  the 2020 catalog. It also seems there are more pages with one strong color
+  rather than most pages having many colors (which is likely why most of the
+  mean colors tend to brown).
+
+All in all, it seems a step up in terms of visualization is needed.
+
+
+## Color themes over time
+Another approach is summarizing the colors of each page individually into what
+is usually called a *theme*. One would think that condensing an image into a
+few representative colors would be slightly easier than representing it using
+only one (mean) color but, quite surprisingly, [the state of the art method for
+generating themes is essentially to use human artists](https://link.springer.com/chapter/10.1007%2F978-3-030-13940-7_13).
+
+If one googles something like "finding principal/dominant colors of an image"
+it is likely that the results include many tutorials applying the machine-learning
+method k-means clustering to the problem. If one takes all the $(R, G, B)$
+triples of the image and divides by 255, we end up with a point cloud that fits
+inside a 3D box with side lengths 1. The axes are the red, green and blue
+components and $(0, 0, 0)$ is black while $(1, 1, 1)$ is white. Points close
+to each other have similar colors. K-means will find $k$ centers where each point
+is assigned to it's nearest center. Once the algorithm has converged these
+centers form a set of principal colors of the image.
+
+This would be a fine method, if not for a number of edge cases. First, the
+outcome is non-deterministic and heavily influenced by random initialization,
+which means it is not guaranteed to find the optimum clustering. And, even if
+it did find one, that clustering might not correspond to a perceptual optimum.
+This can be easily illustrated:
+
+```{r, cache = TRUE, fig.height = 4.5}
+plot_theme <- function(img, color_theme, title) {
+  p1 <- grobTree(
+    rectGrob(gp = gpar(fill = "#EBDDC3", col = "#EBDDC3")),
+    rasterGrob(img, interpolate = TRUE)
+  )
+  p2 <- qplot(
+    x = seq_len(nrow(color_theme)),
+    y = 1,
+    fill = factor(seq_len(nrow(color_theme))),
+    geom = "tile"
+  ) +
+    scale_fill_manual(values = rgb(color_theme)) +
+    theme_void() +
+    theme(
+      legend.position = "none",
+      plot.background = element_rect(fill = "#EBDDC3", color = "#EBDDC3")
+    )
+  grid.arrange(p1, p2, nrow = 1, top = title)
+}
+
+im <- image_read("images/page50-1989.jpg") %>%
+  # Point resizing method produces visually bad results but does not introduce
+  # interpolated colors that was not part of the image from the start.
+  image_resize("25%", filter = "Point")
+im_rgb <- im %>%
+  image_data("rgb") %>%
+  as.numeric()
+d <- dim(im_rgb)
+im_rgb <- array_reshape(im_rgb, c(d[[1]] * d[[2]], 3))
+clustering <- kmeans(im_rgb, centers = 6, iter.max = 50)
+plot_theme(
+  im,
+  clustering$centers,
+  "Theme for page 50 of the 1989 catalog, generated by k-means clustering"
+)
+```
+
+<br/>
+
+For a human, and assuming k-means did not get initialized just right, the
+six-color theme above is likely missing two important colors: a green color from
+the sofa and a red color from the toy vehicle. Without these, the theme does not
+really capture the perceptual qualities of the page. Note that it also misses
+the blue carpet, the pink-striped (red?) wallpaper, and the yellow of the toy
+although it could definitely be argued that's a good thing.
+
+Sometimes the small details are important and sometimes the overall color scheme,
+the most frequently used colors, are important. This is essentially the
+problem with all existing methods, although some deep learning methods use
+training data generated by artists and seem to perform very well in general.
+Without training data available though, it is not feasible to try to reproduce
+these methods.
+
+So, after a long search, a paper by Tan, Echevarria and Gingold,
+"[Efficient palette-based decomposition and recoloring of images via RGBXY-space geometry](https://dl.acm.org/doi/10.1145/3272127.3275054)"
+(2018) emerged with a very promising and intuitive idea, based on the
+observation that color distributions from paintings and natural images often take
+on a convex shape in RGB space. Thus, if one considers the RGB triples a point
+cloud, one can then proceed to find the convex hull of these points. That is,
+the smallest triangulated mesh that fits all points. The vertices of the hull
+are the colors that quite literally stick out (makes the mesh convex). 
+
+One can then proceed to look at each individual edge of the hull and see how
+much volume would be lost if it would be removed and replaced by a single
+vertex. The edge that represents the smallest volume-loss is one we can remove
+and still have similar colors left. If repeated until the desired amount of
+vertices/colors are obtained, one should end up with the colors that most define
+the image.
+
+The paper had me fooled with a promise of a 48 line Python implementation but
+eventually it turned out that the part I needed was a more complex implementation.
+I re-implemented the theme generation part in R (much easier said than done)
+with some minor additions like sorting themes according to the
+[LMS color space](https://en.wikipedia.org/wiki/LMS_color_space)
+in order for easier comparison between two themes (note that sorting by LMS is
+far from an obvious choice but it gave consistent enough results.)
+
+Since this method only indirectly take into account the amount colors are
+used, a single red pixel in an otherwise blue picture could potentially affect
+the outcome. That way, the decision was to resize the images to about 10% of
+their initial size (which is still not that small since the images are so
+large to begin with) in order to lose smaller elements like vividly colored
+books in book cases, etc. An important detail here is that interpolation
+during resizing introduces many new colors and can have a large effect on the
+outcome. Without interpolation, the resized images look bad to a human but in
+this case moiré and other visual artefacts does not matter.
+
+I created the R package [colorhull](https://github.com/lemonad/colorhull) for
+this. The result using the same page as above is the following:
+
+```{r, cache = TRUE, fig.height = 4.5}
+color_theme <- get_theme_colors_from_image("images/page50-1989.jpg", n_colors = 6)
+plot_theme(
+  im,
+  color_theme,
+  paste(
+    "Theme for page 50 of the 1989 catalog, generated by convex-hull",
+    "based clustering"
+  )
+)
+```
+
+<br/>
+
+I would argue that this result is much better than with k-means but at the same
+time, a potential problem might be that it picks up too many colors that is not
+central to the image (e.g. the yellow and blue colors).
+
+Initially I implemented the paper using tibbles and dplyr operations but had to
+rewrite it using matrix operations since it took ages for each image to be
+processed. Even with matrices, it took about a week of CPU-time to process
+all images.
+
+I started generating 6-color themes but since almost all pages contain black and
+white, the difference between themes would really come down to four colors so
+I restarted the process with 8-color themes. It is possible this was a bad
+decision but without further ado, here are all the page themes:
+
+```{r, cache = TRUE}
+years <- 1950L:2020L
+n_colors <- 8
+tile_size <- 3
+x_offset <- 45
+max_n_pages <- 390
+
+ar <- array(
+  1,
+  c(
+    length(years) * n_colors * tile_size,
+    x_offset + tile_size * max_n_pages,
+    3
+  )
+)
+ar[, , 1] <- 1
+ar[, , 2] <- 1
+ar[, , 3] <- 0.93
+
+y <- 1
+for (year in years) {
+  load(paste0("./data/colors", year, ".RData"))
+  x <- x_offset
+  for (theme in rep(rgb_list, each = tile_size)) {
+    d <- dim(theme)[1]
+    if (d < n_colors) {
+      extra <- matrix(rep(theme[d,], n_colors - d), ncol = 3)
+      theme <- rbind(theme, extra)
+    }
+    ar[y:(y + n_colors * tile_size - 1), x, 1:3] <- rep(theme, each = tile_size)
+    x <- x + 1
+  }
+  y <- y + n_colors * tile_size
+}
+
+im <- image_read(ar) %>%
+  image_convert(matte = FALSE, depth = 16)
+y <- 4
+for (year in years) {
+  im <- image_annotate(
+    im,
+    year,
+    size = 18,
+    color = "black",
+    gravity = "northeast",
+    location = paste0("+", tile_size * max_n_pages + 5, "+", y)
+  )
+  y <- y + n_colors * tile_size
+}
+print(im)
+```
+
+*Figure: 8-color themes for the 1950-2020 IKEA catalogs using a convex hull-
+based method. Front pages to the left.*
+
+<br/>
+
+Like with the mean colors, this experiment did not pan out as clear as I hoped
+in terms of color trends over time. Rather than using a limited color scheme
+for each page, from which trends could be picked up, it looks that most pages
+is composed of many colors and all themes have a little of everything. This is
+interesting in itself but given that we know that the interior design ideals of
+the 1970's were very different from the interior design ideals of the 1990's,
+this visualization is not picking these up in an obvious way.
+
+Again, there are still a number of details that are interesting:
+
+1. The colors per catalog follow a quite even distribution in terms of
+   luminosity and saturation. If there are vivid colors in some pages, most
+   pages of the catalog has this property (and vice versa with muted colors).
+   Some of this can be a result of way the catalogs are scanned, often not being
+   true to the original printed colors.
+2. In 2002, IKEA really boosted colors. Both 2002 and 2003 catalogs are outliers
+   with extremely vivid colors:
+   
+   <br/><center>
+   ![](images/page49-2002.jpg){width=500px}
+   
+   *Page 49 of the 2002 catalog.*
+   </center><br/>
+   
+   After 2003, the colors were toned down but are still much more vivid than up
+   to 2001. It looks like saturation is rising toward 2020 and this is something
+   that can be explored further (see below).
+3. IKEA has often used bright colored overlays on pages indicating, for example,
+   if a product is new ("Nyhet!"). This can be seen most clearly in the red
+   colors throughout the 1989 and 1990 catalogs.
+4. Although the interiors IKEA showcase are styled, they also set out to be
+   realistic, capturing the clutter of daily life with the wide array
+   of colors represented in our homes. This makes it difficult to summarize
+   the use of colors using a limited palette.
+
+Perhaps it had been better to stick with 6-color themes but all in all, the
+material was more difficult to work with than intially expected.
+
+
+## Saturation over time
+If not color then perhaps some general trends could be found by looking at
+saturation, or vividness, of color alone.
+
+One option is to display mean saturation per page, similar to the mean color
+visualization but here, using a more objective metric seems like the better
+choice. This would also enable us to see if the data backs the intuition of color
+saturation peaking in 2002-2003, backing off and then increasing again between
+2010 and 2020.
+
+However, the question of how to define saturation arises. There are multiple
+definitions and pros and cons to take into account. E.g. if starting with a
+maximally saturated blue color and mixing in white, does that affect saturation
+or not? Does mixing in black affect saturation? Perceptually, most people tend
+to agree on a bright green being more saturated than black and white. [HSV and
+HSL](https://en.wikipedia.org/wiki/HSL_and_HSV) color spaces are problematic in
+this regard but are also easy to work with. Using HSV at least avoids the
+problem of white being maximally saturated.
+
+The choice here is to preprocess each image and generate a list of the mean and
+median saturation per page. Saturation is calculated by converting each pixel
+value from the RGB to HSV colorspace and extracting the saturation (S channel).
+This can then be used to calculate pooled means and medians as well as to
+provide data for confidence intervals.
+
+If the confidence intervals are narrow, this would be evidence towards that
+(1), above, also holds.
+
+```{r, cache = TRUE}
+#source("saturation.r")
+years <- 1950L:2020L
+sat_df <- tibble(year = integer(), type = factor(), value = numeric())
+for (year in years) {
+  load(paste0("./data/stats", year, ".RData"))
+  sat_df <- sat_df %>%
+    union(
+      tibble(
+        year = year,
+        type = factor("mean"),
+        value = map(stats_list, function(x) {x$saturation_mean}) %>% unlist
+      )
+    ) %>%
+    union(
+      tibble(
+        year = year,
+        type = factor("median"),
+        value = map(stats_list, function(x) {x$saturation_median}) %>% unlist
+      )
+    )
+}
+sat_df %>%
+  ggplot(aes(x = year, y = value, color = type)) +
+  geom_smooth(method = "loess", formula = y ~ x, span = 0.1) +
+  xlab("Year") +
+  ylab("Saturation") +
+  labs(
+    title = "Pooled saturation means and medians over time",
+    subtitle = "95% confidence intervals."
+  ) +
+  theme_minimal()
+```
+
+<br/>
+
+Turns out that peak saturation was at 1991, which was not expected but perhaps
+there is something to it.
+
+<br/><center>
+![](images/page158-1991.jpg){width=500px}
+
+*Page 158 of the 1991 catalog. We've come a long way since then.*
+</center><br/>
+
+More surprising is that the saturation during the late 2010's is much lower than
+any other period, which is not something that is apparent from the theme
+visualization. That the saturation is lower than during the 1950's might not
+be so strange, given that all pages of the earlier catalogs are sepia colored.
+
+Overall, it is likely that the abundant use of white and black in the catalogs
+is affecting the outcome too much to draw general conclusions from but at least
+it seems to pick up on the dip in saturation during the 1980's.
+
+<br/><center>
+![](images/page43-1984.jpg){width=500px}
+
+*Page 43 of the 1984 catalog.*
+</center><br/>
+
+# Prologue
+A failed experiment is still an experiment. Even though the IKEA catalogs from
+the 1970's are distinctly different from the catalogs in the 1990's, is is
+not trivial to pick this up by looking at color alone. Perhaps credit is due to
+IKEA's unique visual style. Also, IKEA caters to everyone and not everyone
+wants the same thing at the same time, which is made very obvious in the 1969
+catalog:
+
+<br/><center>
+![](images/page2-1969.jpg){width=250px} ![](images/page73-1969.jpg){width=250px}
+
+*Page 2 vs page 73 in the 1969 catalog.*
+</center><br/>
+
+
