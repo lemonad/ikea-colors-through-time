@@ -1,7 +1,7 @@
 ---
-title: "The snappy title of your project"
-author: "Jens Jensen"
-date: "2020-12-17"
+title: "IKEA catalogs and colors through time"
+author: "Jonas Nockert"
+date: "2021-01-13"
 output:
   ioslides_presentation:
     logo: SU_logo_CMYK.png
@@ -11,29 +11,83 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(grid)
+library(gridExtra)
+library(magick)
+library(magrittr)
+library(reticulate)
+
+# Use the offical IKEA typeface!
+library(gfonts)
+use_font("noto-sans", "../report/fonts/css/noto-sans.css")
+
+source("../Report/colors.r")
+source("../Report/plotting.r")
 ```
 
-## R Markdown
 
-This is an R Markdown presentation. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document.
-
-## Slide with Bullets
-
-- Bullet 1
-- Bullet 2
-- Bullet 3
-
-## Slide with R Output
-
-```{r cars, echo = TRUE}
-summary(cars)
+```{r, cached = TRUE, include = FALSE}
+years <- 1950L:2021L
+total_pages <- 0L
+total_pixels <- 0L
+for (year in years) {
+  load(paste0("../Report/data/stats", year, ".RData"))
+  total_pages <- total_pages + length(stats_list)
+  total_pixels <- total_pixels +
+    sum(map(stats_list, function(x) x$n_pixels) %>% unlist)
+}
 ```
 
-## Slide with Plot
+## 72 ÅR, 72 KATALOGER {data-background=../report/images/ikea-frontpage-plot.png data-background-size=cover}
 
-```{r pressure}
-plot(pressure)
+
+## <br/><br/><br/><br/><br/><br/>`r total_pages` SIDOR<br/>`r total_pixels` PIXELS {data-background=../report/images/page2-1969.jpg data-background-size=cover}
+
+
+## EN BILDS MEDELFÄRG
+
+```{r, cache = TRUE, fig.height = 4.5, echo = FALSE}
+im <- image_read("../Report/images/page50-1989.jpg") %>%
+  # Point resizing method produces visually bad results but does not introduce
+  # interpolated colors that was not part of the image from the start.
+  image_resize("25%", filter = "Point")
+im_rgb <- im %>%
+  image_data("rgb") %>%
+  as.numeric()
+d <- dim(im_rgb)
+im_rgb <- array_reshape(im_rgb, c(d[[1]] * d[[2]], 3))
+mean_color <- colMeans(im_rgb)
+plot_theme(im, matrix(mean_color, ncol = 3))
 ```
 
+
+## FÄRGTEMA VIA K-MEANS-KLUSTRING
+
+```{r, cache = TRUE, fig.height = 4.5, echo = FALSE}
+clustering <- kmeans(im_rgb, centers = 6, iter.max = 50)
+plot_theme(im, clustering$centers)
+```
+
+
+## KONVEXT HÖLJE AV EN BILD {data-background=../report/images/convex-hull-tan-2016.png data-background-size=contain}
+
+
+## FÄRGTEMA VIA KONVEXT HÖLJE
+
+```{r, cache = TRUE, fig.height = 4.5, echo = FALSE}
+color_theme <- get_theme_colors_from_image(
+  "../Report/images/page50-1989.jpg",
+  n_colors = 6
+)
+plot_theme(im, color_theme)
+```
+
+
+## TROR NI DET FUNGERADE? :) {.flexbox .vcenter data-background=../report/images/page49-2002.jpg data-background-size=cover}
+
+<div class="large-outline">
+👍 JA
+<br/><br/><br/>
+👎 NEJ
+</div>

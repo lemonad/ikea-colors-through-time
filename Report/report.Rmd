@@ -5,7 +5,7 @@ date: 2020-01-15
 output:
   tufte::tufte_html:
     self_contained: true
-    toc: false
+    toc: true
     toc_depth: 2
     css: style.css
     fig.retina: 2
@@ -37,6 +37,9 @@ setup_font(
   output_dir = "fonts"
 )
 use_font("noto-sans", "fonts/css/noto-sans.css")
+
+source("colors.r")
+source("plotting.r")
 ```
 
 
@@ -87,7 +90,7 @@ for (year in years) {
 
 The idea is to use the raw pixels of each such image to generate data for
 visualization. Since it takes many days of cpu-time to process everything
-(`r total_pages` pages in total!), by necessity, the output from the preprocessing
+(`r total_pages` pages!), by necessity, the output from the preprocessing
 steps is what will be used here. All of the necessary R code for
 reproducing the results can be found in the accompanying
 [Github repo](https://github.com/MT5013-HT20/PR_lemonad) and R package
@@ -199,26 +202,6 @@ it did find one, it might not correspond to a perceptual optimum.
 This can be easily illustrated:
 
 ```{r, cache = TRUE, fig.height = 4.5}
-plot_theme <- function(img, color_theme) {
-  p1 <- grobTree(
-    rectGrob(gp = gpar(fill = "#EBDDC3", col = "#EBDDC3")),
-    rasterGrob(img, interpolate = TRUE)
-  )
-  p2 <- qplot(
-    x = seq_len(nrow(color_theme)),
-    y = 1,
-    fill = factor(seq_len(nrow(color_theme))),
-    geom = "tile"
-  ) +
-    scale_fill_manual(values = rgb(color_theme)) +
-    theme_void() +
-    theme(
-      legend.position = "none",
-      plot.background = element_rect(fill = "#EBDDC3", color = "#EBDDC3")
-    )
-  grid.arrange(p1, p2, nrow = 1)
-}
-
 im <- image_read("images/page50-1989.jpg") %>%
   # Point resizing method produces visually bad results but does not introduce
   # interpolated colors that was not part of the image from the start.

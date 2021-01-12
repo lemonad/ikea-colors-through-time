@@ -45,10 +45,17 @@ slides > slide.dark {
 }
 
 h2 {
-  font-size: 45px;
-  line-height: 65px;
+  font-size: 54px;
+  font-family: "Noto Sans", sans-serif;
+  line-height: 1.4;
   letter-spacing: -2px;
-  color: #002F5F;
+  color: #FFDA1A;
+  text-shadow: 1px 1px 6px #000;
+  /*
+   * -webkit-text-fill-color: #FFDA1A;
+   * -webkit-text-stroke-width: 1px;
+   * -webkit-text-stroke-color: #000000; /* 4d4108; /
+  */
 }
 
 h3 {
@@ -61,6 +68,18 @@ h3 {
 
 small {
     font-size: 10px;
+}
+
+#right {
+  text-align: right !important;
+  align: right !important;
+}
+
+.large-outline {
+  font-size: 54px;
+  color: #ffda1a;
+  font-weight: bold;
+  text-shadow: 1px 1px 6px #000;
 }
 
 <style>
