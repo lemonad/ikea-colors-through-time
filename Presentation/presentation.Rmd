@@ -35,13 +35,16 @@ source("../Report/plotting.r")
 ```{r, cached = TRUE, include = FALSE}
 years <- 1950L:2021L
 total_pages <- 0L
-total_pixels <- 0L
+total_pixels <- 0
 for (year in years) {
   load(paste0("../Report/data/stats", year, ".RData"))
   total_pages <- total_pages + length(stats_list)
   total_pixels <- total_pixels +
     sum(map(stats_list, function(x) x$n_pixels) %>% unlist)
 }
+# ~100x since images are resized to 10% of their original size
+# before preprocessing.
+total_pixel_str <- format(total_pixels * 100, digits = 14)
 ```
 
 ## 72 ÅR OCH 72 KATALOGER {.flexbox .vcenter data-background=../report/images/ikea-frontpage-plot.png data-background-size=cover}
@@ -50,7 +53,7 @@ for (year in years) {
 Går det att hitta trender i färgsättning över tid?
 </div>
 
-## <br/><br/><br/><br/><br/><br/>`r total_pages` SIDOR OCH<br/>`r total_pixels` PIXELS {data-background=../report/images/page2-1969.jpg data-background-size=cover}
+## <br/><br/><br/><br/><br/><br/>`r total_pages` SIDOR OCH<br/>`r total_pixel_str` PIXELS {data-background=../report/images/page2-1969.jpg data-background-size=cover}
 
 
 ## SÅ MÅNGA FÄRGER {.flexbox .vcenter data-background=../report/images/page43-1984.jpg data-background-size=cover}

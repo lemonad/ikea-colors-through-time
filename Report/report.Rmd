@@ -59,8 +59,8 @@ source("plotting.r")
 IKEA has [all their catalogs, 1950--2021, online](https://ikeamuseum.com/sv/ikea-kataloger/),
 which should represent a unique slice of time of what is popular within interior
 design. IKEA worked with customer feedback from the start in order to sell just
-the right products and based on their success over the years (see mail-in form
-from the 1955 catalog in the margin), it seems safe to say that IKEA has
+the right products (see mail-in form from the 1955 catalog in the margin) and
+based on their success over the years, it seems safe to say that IKEA has
 consistently offered what people want.
 
 The question emerges if it is possible to pick up general design trends from the
@@ -115,6 +115,7 @@ tile_size <- c(24, 3)
 x_offset <- 45
 max_n_pages <- 390
 
+# Create pixel array and fill with default background color.
 ar <- array(
   1,
   c(
@@ -127,6 +128,7 @@ ar[, , 1] <- 1
 ar[, , 2] <- 1
 ar[, , 3] <- 248 / 255
 
+# Draw a colored tile per page, per year.
 y <- 1
 for (year in years) {
   load(paste0("./data/stats", year, ".RData"))
@@ -299,6 +301,7 @@ tile_size <- 3
 x_offset <- 45
 max_n_pages <- 390
 
+# Initialize pixel array.
 ar <- array(
   1,
   c(
@@ -311,6 +314,7 @@ ar[, , 1] <- 1
 ar[, , 2] <- 1
 ar[, , 3] <- 248 / 255
 
+# Fill array with one tile per color, per page, per year.
 y <- 1
 for (year in years) {
   load(paste0("./data/colors", year, ".RData"))
@@ -341,28 +345,28 @@ for (year in years) {
   )
   y <- y + n_colors * tile_size
 }
-print(im)
+im
 ```
 
 *Figure: 8-color themes for the 1950-2020 catalogs using a convex hull-
 based method. Front pages to the left.*
 <br/>
 
-This experiment also did not pan out as clear as I hoped in terms of trends over
-time. Rather than using a limited color scheme for each page, it looks that most
-pages is composed of many colors and all themes have a little of everything. This
-is interesting in itself but given that we know that the interior design ideals of
-the 1970's were very different from the interior design ideals of the 1990's,
-this visualization is not picking these up in an obvious way.
+As before, this experiment did not pan out as clear as I hoped in terms of trends
+over time. Rather than using a limited color scheme for each page, it looks like
+most pages are composed of many colors and all themes have a little of everything.
+This is interesting in itself but given that we know that the interior design
+ideals of the 1970's were very different from those of the 1990's, this
+visualization is not picking up the differences in an obvious way.
 
-Again, there are a few interesting details:
+There are a few interesting details though:
 
 1. The colors per catalog follow a quite even distribution in terms of
    luminosity and saturation. If there are vivid colors in some pages, most
    pages of the catalog have this property (and vice versa with muted colors).
    Some of this is likely a result of the way catalogs are scanned, often not
    being true to the original printed colors.
-2. In 2002-2003, IKEA really boosted colors!
+2. In 2002-2003, IKEA *really* boosted colors:
    
    <br/>
    ![](images/page49-2002.jpg)
@@ -373,9 +377,9 @@ Again, there are a few interesting details:
    After 2003, the colors were toned down but are still much more vivid than up
    to 2001. It looks like saturation is rising toward 2020 and this is something
    that can be explored further (see below).
-3. IKEA often use bright colored overlays indicating, for example,
-   if a product is new ("Nyhet!"). This can be seen most clearly in the red
-   colors throughout the 1989-1990 catalogs.
+3. IKEA often uses bright colored overlays indicating, for example,
+   if a product is new ("Nyhet!"). This can be seen most clearly in the reds
+   throughout the 1989-1990 catalogs.
 4. Although the interiors IKEA showcase are styled, they also set out to be
    realistic, capturing the wide array of colors represented in our homes.
    This makes it difficult to summarize the use of colors using a limited
@@ -397,20 +401,27 @@ this regard but are also easy to work with. Using HSV at least avoids the
 problem of white being maximally saturated.
 ```
 
-Saturation is here calculated by converting each pixel
-value from the RGB to HSV colorspace and extracting the S channel.
-This is then used to calculate pooled means and medians as well as to
-provide data for confidence intervals.
+Saturation can be calculated by converting each pixel
+value from the RGB to HSV color space and extracting the S channel.
+This is then used to calculate pooled means and standard deviations for
+confidence intervals.
+
+```{marginfigure}
+It should also be noted that saturation is not necessarily perceptually linear
+between different hues or luminosities. Thus, using the mean saturation is
+potentially problematic but the alternatives seem to be far more complex.
+```
 
 If the confidence intervals are narrow, this would be evidence towards that
-(1), above, also holds.
+(1), above, holds.
 
 ```{r, cache = TRUE}
 years <- 1950L:2021L
-sat_df <- tibble(year = integer(), type = factor(), value = numeric())
-pooled_means <- c()
-confidence_intervals <- c()
+mean_df <- tibble(year = integer(), pooled_mean = numeric(), ci = numeric())
 for (year in years) {
+  # The data loaded is e.g. mean saturation per page so we need to weigh/pool
+  # this according to the number of pixels on each page in order to get one
+  # value to plot for the entire catalog/year.
   load(paste0("./data/stats", year, ".RData"))
   denominator <- reduce(stats_list, function(x, y) x + y$n_pixels, .init = 0)
   pooled_mean <- reduce(
@@ -418,7 +429,6 @@ for (year in years) {
     function(x, y) x + y$saturation_mean * y$n_pixels,
     .init = 0
   ) / denominator
-  pooled_means[length(pooled_means) + 1] <- pooled_mean
 
   pooled_sd <- sqrt(
     reduce(
@@ -430,16 +440,15 @@ for (year in years) {
   ninv <- sqrt(
     reduce(stats_list, function(x, y) x + 1 / y$n_pixels, .init = 0)
   )
-  confidence_intervals[length(confidence_intervals) + 1] <- (
-    1.96 * pooled_sd * ninv
-  )
+
+  mean_df <- mean_df %>%
+    add_row(
+      year = year,
+      pooled_mean = pooled_mean,
+      ci = 1.96 * pooled_sd * ninv
+    )
 }
 
-mean_df <- tibble(
-  year = years,
-  pooled_mean = pooled_means,
-  ci = confidence_intervals
-)
 mean_df %>%
   ggplot(aes(x = year, y = pooled_mean)) +
   geom_line(color = "#C4961A") +
@@ -449,7 +458,6 @@ mean_df %>%
     alpha = 0.25
   ) +
   geom_vline(xintercept = 1991, linetype = 2, color = "gray") +
-  geom_vline(xintercept = 2005, linetype = 2, color = "gray") +
   annotate(
     "text",
     label = "1991",
@@ -493,15 +501,14 @@ it's picking up on the dip in saturation in the 2021 catalog:
 <br/>
 ![](images/page22-2021.jpg)
 
-*Page 43 of the 1984 catalog.*
+*Page 22 of the 2021 catalog.*
 <br/>
 
 # Prologue
 Even though the IKEA catalogs from the 1970's are distinctly different from the
-catalogs in the 1990's, it seems non-trivial to pick this up by looking at color
-alone. This says something about IKEA's visual style. That IKEA caters to
-everyone and not everyone wants the same thing at the same time does not help
-with picking up trends either, which is made very obvious by the 1969 catalog:
+catalogs in the 1990's, it seems non-trivial to visualize these differences
+by just using color. That IKEA caters to everyone and not everyone wants the
+same thing at the same time does not help with picking up trends either:
 
 <br/>
 ![](images/page2-1969.jpg)
