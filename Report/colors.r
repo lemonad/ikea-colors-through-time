@@ -42,6 +42,7 @@ get_saturation_from_image <- function(filepath) {
     rgb_mean = colMeans(colors_rgb),
     saturation_mean = mean(colors_hsv[, 2]),
     saturation_median = median(colors_hsv[, 2]),
+    saturation_sd = sd(colors_hsv[, 2]),
     luminance_mean = mean(colors_ycbcr[, 1]),
     luminance_median = median(colors_ycbcr[, 1])
   )

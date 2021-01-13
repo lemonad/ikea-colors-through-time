@@ -125,7 +125,7 @@ ar <- array(
 )
 ar[, , 1] <- 1
 ar[, , 2] <- 1
-ar[, , 3] <- 1
+ar[, , 3] <- 248 / 255
 
 y <- 1
 for (year in years) {
@@ -309,7 +309,7 @@ ar <- array(
 )
 ar[, , 1] <- 1
 ar[, , 2] <- 1
-ar[, , 3] <- 0.93
+ar[, , 3] <- 248 / 255
 
 y <- 1
 for (year in years) {
@@ -406,36 +406,55 @@ If the confidence intervals are narrow, this would be evidence towards that
 (1), above, also holds.
 
 ```{r, cache = TRUE}
-#source("saturation.r")
 years <- 1950L:2021L
 sat_df <- tibble(year = integer(), type = factor(), value = numeric())
+pooled_means <- c()
+confidence_intervals <- c()
 for (year in years) {
   load(paste0("./data/stats", year, ".RData"))
-  sat_df <- sat_df %>%
-    union(
-      tibble(
-        year = year,
-        type = factor("mean"),
-        value = map(stats_list, function(x) {x$saturation_mean}) %>% unlist
-      )
-    ) %>%
-    union(
-      tibble(
-        year = year,
-        type = factor("median"),
-        value = map(stats_list, function(x) {x$saturation_median}) %>% unlist
-      )
-    )
+  denominator <- reduce(stats_list, function(x, y) x + y$n_pixels, .init = 0)
+  pooled_mean <- reduce(
+    stats_list,
+    function(x, y) x + y$saturation_mean * y$n_pixels,
+    .init = 0
+  ) / denominator
+  pooled_means[length(pooled_means) + 1] <- pooled_mean
+
+  pooled_sd <- sqrt(
+    reduce(
+      stats_list,
+      function(x, y) x + y$saturation_sd^2 * (y$n_pixels - 1),
+      .init = 0
+    ) / (denominator - length(stats_list))
+  )
+  ninv <- sqrt(
+    reduce(stats_list, function(x, y) x + 1 / y$n_pixels, .init = 0)
+  )
+  confidence_intervals[length(confidence_intervals) + 1] <- (
+    1.96 * pooled_sd * ninv
+  )
 }
-sat_df %>%
-  ggplot(aes(x = year, y = value, color = type)) +
-  geom_smooth(method = "loess", formula = y ~ x, span = 0.1) +
+
+mean_df <- tibble(
+  year = years,
+  pooled_mean = pooled_means,
+  ci = confidence_intervals
+)
+mean_df %>%
+  ggplot(aes(x = year, y = pooled_mean)) +
+  geom_line(color = "#C4961A") +
+  geom_ribbon(
+    aes(ymin = pooled_mean - ci, ymax = pooled_mean + ci),
+    fill = "#C4961A",
+    alpha = 0.25
+  ) +
   geom_vline(xintercept = 1991, linetype = 2, color = "gray") +
+  geom_vline(xintercept = 2005, linetype = 2, color = "gray") +
   annotate(
     "text",
     label = "1991",
     x = 1991,
-    y = 0,
+    y = 0.1,
     angle = 90,
     hjust = 0,
     vjust = 1.5,
@@ -443,18 +462,17 @@ sat_df %>%
   ) +
   xlab("Year") +
   ylab("Saturation") +
-  scale_colour_manual(values = c("mean" = "#52854C", "median" = "#C4961A")) +
-  labs(
-    title = "Pooled saturation means and medians over time",
-    subtitle = "95% confidence intervals."
-  ) +
-  theme_tufte(base_family = "sans")
+  theme_tufte(base_family = "sans") +
+  theme(
+    panel.background = element_rect("#fffff8", NA),
+    plot.background = element_rect(fill = "#fffff8", NA)
+  )
 ```
 
-*Figure: Pooled saturation over time (with 95% confidence intervals.)*
+*Figure: Pooled mean saturation over time (with 95% confidence interval.)*
 <br/>
 
-Turns out that peak saturation was actually at 1991. Perhaps there is
+Turns out that peak saturation was actually at 1991... and perhaps there is
 something to it:
 
 <br/>
@@ -463,28 +481,27 @@ something to it:
 *Page 158 of the 1991 catalog.*
 <br/>
 
-More surprising is that saturation during the late 2010's is lower than
-any other period, which is not apparent from the theme visualization. That the
+More surprising is that saturation during the late 2010's is lower than almost
+all other periods, which is not apparent from the theme visualization. That the
 saturation is lower than during the 1950's is due to the earliest catalogs
 being sepia colored.
 
 Overall, it is likely that the abundant use of black and white in the catalogs
 is affecting the outcome too much to draw general conclusions from but at least
-it seems to pick up on the dip in saturation during the 1980's:
+it's picking up on the dip in saturation in the 2021 catalog:
 
 <br/>
-![](images/page43-1984.jpg)
+![](images/page22-2021.jpg)
 
 *Page 43 of the 1984 catalog.*
 <br/>
 
 # Prologue
-Even though the IKEA catalogs from
-the 1970's are distinctly different from the catalogs in the 1990's, it seems
-it is not trivial to pick this up by looking at color alone. This says
-something about IKEA's visual style. That IKEA caters to everyone and not
-everyone wants the same thing at the same time does not help with picking up
-trends either, which is made very obvious by the 1969 catalog:
+Even though the IKEA catalogs from the 1970's are distinctly different from the
+catalogs in the 1990's, it seems non-trivial to pick this up by looking at color
+alone. This says something about IKEA's visual style. That IKEA caters to
+everyone and not everyone wants the same thing at the same time does not help
+with picking up trends either, which is made very obvious by the 1969 catalog:
 
 <br/>
 ![](images/page2-1969.jpg)
