@@ -1,5 +1,5 @@
 ---
-title: "IKEA catalogs and colors through time"
+title: "Colors through time:<br/>IKEA catalogs 1950–2021"
 author: "Jonas Nockert"
 date: "2021-01-13"
 output:
@@ -17,6 +17,11 @@ library(gridExtra)
 library(magick)
 library(magrittr)
 library(reticulate)
+
+# brew install glpk
+# brew install qhull
+# devtools::install_github("lemonad/colorhull")
+library(colorhull)
 
 # Use the offical IKEA typeface!
 library(gfonts)
@@ -39,11 +44,21 @@ for (year in years) {
 }
 ```
 
-## 72 ÅR, 72 KATALOGER {data-background=../report/images/ikea-frontpage-plot.png data-background-size=cover}
+## 72 ÅR OCH 72 KATALOGER {.flexbox .vcenter data-background=../report/images/ikea-frontpage-plot.png data-background-size=cover}
+
+<div class="large-outline">
+Går det att hitta trender i färgsättning över tid?
+</div>
+
+## <br/><br/><br/><br/><br/><br/>`r total_pages` SIDOR OCH<br/>`r total_pixels` PIXELS {data-background=../report/images/page2-1969.jpg data-background-size=cover}
 
 
-## <br/><br/><br/><br/><br/><br/>`r total_pages` SIDOR<br/>`r total_pixels` PIXELS {data-background=../report/images/page2-1969.jpg data-background-size=cover}
+## SÅ MÅNGA FÄRGER {.flexbox .vcenter data-background=../report/images/page43-1984.jpg data-background-size=cover}
 
+<div class="large-outline">
+Hur kan materialet organiseras eller transformeras för att kunna
+visualiseras på ett meningsfullt sätt?
+</div>
 
 ## EN BILDS MEDELFÄRG
 
@@ -84,10 +99,10 @@ plot_theme(im, color_theme)
 ```
 
 
-## TROR NI DET FUNGERADE? :) {.flexbox .vcenter data-background=../report/images/page49-2002.jpg data-background-size=cover}
+## FUNGERADE DET? {.flexbox .vcenter data-background=../report/images/page49-2002.jpg data-background-size=cover}
 
 <div class="large-outline">
 👍 JA
-<br/><br/><br/>
+<br/><br/>
 👎 NEJ
 </div>

@@ -1,5 +1,6 @@
 ---
-title: IKEA catalogs and colors through time
+title: "Colors through time"
+subtitle: "IKEA catalogs 1950–2021"
 author: Jonas Nockert (@lemonad)
 date: 2020-01-15
 output:
@@ -22,9 +23,8 @@ library(magick)
 library(magrittr)
 library(reticulate)
 library(scales)
-library(ggpomological)
 library(tufte)
-# 
+
 # brew install glpk
 # brew install qhull
 # devtools::install_github("lemonad/colorhull")
